@@ -1,15 +1,17 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import classNames from 'classnames';
 import { react2angular } from 'react2angular';
 import Button from 'antd/lib/button';
+import Dropdown from 'antd/lib/dropdown';
 import Select from 'antd/lib/select';
 import Input from 'antd/lib/input';
 import InputNumber from 'antd/lib/input-number';
 import Icon from 'antd/lib/icon';
-import Tag from 'antd/lib/tag';
+import Menu from 'antd/lib/menu';
 import Tooltip from 'antd/lib/tooltip';
 import EditDateParameterDialog from '@/components/EditDateParameterDialog';
-import { defer, isFunction, includes } from 'lodash';
+import { defer, isFunction } from 'lodash';
 import { DateInput } from './DateInput';
 import { DateRangeInput } from './DateRangeInput';
 import { DateTimeInput } from './DateTimeInput';
@@ -19,6 +21,61 @@ import { QueryBasedParameterInput } from './QueryBasedParameterInput';
 import './ParameterValueInput.less';
 
 const { Option } = Select;
+
+// TODO: Send DynamicButton somewhere else and optmize for different parameter types
+
+const DATE_INTERVAL_OPTIONS = [
+  { name: 'Last week', value: 'd_last_week' },
+  { name: 'Last month', value: 'd_last_month' },
+  { name: 'Last year', value: 'd_last_year' },
+  { name: 'Last 7 days', value: 'd_last_7_days' },
+];
+
+function DynamicButton({ onSelect, enabled }) {
+  const menu = (
+    <Menu
+      className="dynamic-menu"
+      onClick={({ key }) => onSelect(key)}
+    >
+      <Menu.Item key="static">
+        Static value
+      </Menu.Item>
+      {DATE_INTERVAL_OPTIONS.map(option => (
+        <Menu.Item key={option.value}>
+          {option.name} <em>Jan 1 - Jan 7</em>
+        </Menu.Item>
+      ))}
+    </Menu>
+  );
+
+  return (
+    <a onClick={e => e.stopPropagation()}>
+      <Dropdown.Button
+        overlay={menu}
+        className="dynamic-button"
+        placement="bottomRight"
+        trigger={['click']}
+        icon={(
+          <Icon
+            type="thunderbolt"
+            theme={enabled ? 'filled' : 'outlined'}
+            className="dynamic-icon"
+          />
+        )}
+      />
+    </a>
+  );
+}
+
+DynamicButton.propTypes = {
+  onSelect: PropTypes.func,
+  enabled: PropTypes.bool,
+};
+
+DynamicButton.defaultProps = {
+  onSelect: () => {},
+  enabled: false,
+};
 
 export class ParameterValueInput extends React.Component {
   static propTypes = {
@@ -65,6 +122,16 @@ export class ParameterValueInput extends React.Component {
         this.setState({ hasDynamicDateTime: parameter.hasDynamicValue });
       });
   };
+
+  onDynamicValueSelect = (dynamicValue) => {
+    const { onSelect, parameter } = this.props;
+    if (dynamicValue === 'static') {
+      this.setState({ hasDynamicDateTime: false }, () => onSelect(parameter.getValue()));
+    } else {
+      onSelect(dynamicValue);
+      this.setState({ hasDynamicDateTime: true });
+    }
+  }
 
   renderApplyButton() {
     const { onSelect } = this.props;
@@ -156,25 +223,23 @@ export class ParameterValueInput extends React.Component {
   }
 
   renderDateRangeInput() {
-    const { value, onSelect } = this.props;
+    const { value, parameter, onSelect } = this.props;
+    const { hasDynamicDateTime } = this.state;
     return (
       <DateRangeInput
-        className={this.props.className}
+        className={classNames('redash-datepicker', { 'dynamic-value': hasDynamicDateTime }, this.props.className)}
         value={value}
-        onSelect={onSelect}
-        suffixIcon={this.renderDynamicOptionButton()}
+        {...hasDynamicDateTime && ({ placeholder: [parameter.dynamicValue && parameter.dynamicValue.name] })}
+        onSelect={selectedValue => this.setState({ hasDynamicDateTime: false }, () => onSelect(selectedValue))}
+        suffixIcon={(
+          <DynamicButton
+            enabled={hasDynamicDateTime}
+            onSelect={this.onDynamicValueSelect}
+          />
+        )}
+        hideValue={hasDynamicDateTime}
         allowClear={false}
       />
-    );
-  }
-
-  renderDynamicDateRangeTag() {
-    const { parameter } = this.props;
-    return (
-      <div className="d-inline-flex align-items-center" style={{ height: 35 }}>
-        <Tag onClick={this.openDateParameterDialog}>{parameter.dynamicValue.name}</Tag>
-        {this.renderDynamicOptionButton()}
-      </div>
     );
   }
 
@@ -270,12 +335,6 @@ export class ParameterValueInput extends React.Component {
 
   render() {
     const { type } = this.props;
-    const isDateRangeType = includes(['datetime-range-with-seconds', 'datetime-range', 'date-range'], type);
-
-    if (this.state.hasDynamicDateTime && isDateRangeType) {
-      return this.renderDynamicDateRangeTag();
-    }
-
     switch (type) {
       case 'datetime-with-seconds': return this.renderDateTimeWithSecondsInput();
       case 'datetime-local': return this.renderDateTimeInput();
