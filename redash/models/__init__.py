@@ -653,7 +653,7 @@ class Query(ChangeTrackingMixin, TimestampMixin, BelongsToOrgMixin, db.Model):
 
     @property
     def dashboard_api_keys(self):
-        query = """SELECT api_keys.api_key
+        query = """SELECT distinct api_keys.api_key
                    FROM api_keys
                    JOIN dashboards ON object_id = dashboards.id
                    JOIN widgets ON dashboards.id = widgets.dashboard_id
