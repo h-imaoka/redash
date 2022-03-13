@@ -1,5 +1,7 @@
 # for compat 202203
 alembic==1.2.1
+setuptools-scm==5.0.2
+rsa==4.0
 
 Flask==0.12.4
 Werkzeug==0.11.11
